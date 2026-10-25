@@ -1,0 +1,20 @@
+{
+  "name": "vishal-ph-backend",
+  "version": "1.0.0",
+  "description": "WebSocket signaling and MongoDB room metadata for Vishal PH",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mongodb": "^6.17.0",
+    "ws": "^8.22.0"
+  }
+}
