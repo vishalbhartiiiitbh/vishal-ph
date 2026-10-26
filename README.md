@@ -35,7 +35,8 @@ npm run dev
 
 Open <http://localhost:3000> in two browser windows. Create a room in one,
 then join with its invite link or six-character code. Once the peer connection
-is ready, select a file and choose **Send file**.
+is ready, select multiple files in the file picker and choose **Send files**.
+The files are sent one by one, and each arrives as a separate download.
 
 The room card includes **Show QR code**. A phone can scan it using its native
 camera and open the invite link; the page automatically joins that room. The

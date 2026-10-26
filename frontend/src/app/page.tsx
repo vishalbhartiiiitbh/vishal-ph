@@ -76,7 +76,7 @@ export default function Home() {
   const [joinCode, setJoinCode] = useState("");
   const [peerState, setPeerState] = useState("disconnected");
   const [status, setStatus] = useState("Connecting to the signaling server...");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [transfer, setTransfer] = useState<TransferState>(emptyTransfer);
   const [copied, setCopied] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -144,13 +144,13 @@ export default function Home() {
     setPeerState(channel.readyState === "open" ? "connected" : "connecting");
     setStatus(
       channel.readyState === "open"
-        ? "Peer connected. You can send a file directly."
+        ? "Peer connected. You can send files directly."
         : "Peer found. Establishing a direct connection...",
     );
 
     channel.onopen = () => {
       setPeerState("connected");
-      setStatus("Peer connected. You can send a file directly.");
+      setStatus("Peer connected. You can send files directly.");
     };
 
     channel.onclose = () => {
@@ -454,106 +454,116 @@ export default function Home() {
     }
   };
 
-  const selectFile = (file?: File) => {
-    if (!file) return;
-    setSelectedFile(file);
+  const selectFiles = (files?: FileList | File[]) => {
+    if (!files?.length) return;
+    const selected = Array.from(files);
+    setSelectedFiles(selected);
     setTransfer({
       direction: "send",
-      name: file.name,
+      name: selected[0].name,
       transferred: 0,
-      total: file.size,
+      total: selected[0].size,
       result: "idle",
     });
     setStatus(
       channelRef.current?.readyState === "open"
-        ? `${file.name} is ready to send.`
-        : "File selected. Connect to a peer before sending.",
+        ? `${selected.length} file${selected.length === 1 ? "" : "s"} ready to send.`
+        : "Files selected. Connect to a peer before sending.",
     );
   };
 
   const sendFile = async () => {
-    const file = selectedFile;
+    const files = selectedFiles;
     const channel = channelRef.current;
-    if (!file || !channel || channel.readyState !== "open") {
+    if (files.length === 0 || !channel || channel.readyState !== "open") {
       setStatus("Connect to a peer before sending a file.");
       return;
     }
 
     cancelSendRef.current = false;
     channel.bufferedAmountLowThreshold = BUFFER_LOW;
-    setTransfer({
-      direction: "send",
-      name: file.name,
-      transferred: 0,
-      total: file.size,
-      result: "active",
-    });
-    setStatus(`Sending ${file.name} directly to your peer...`);
+    let currentFile = files[0];
+    let currentIndex = 0;
 
     try {
-      channel.send(JSON.stringify({
-        type: "meta",
-        payload: { name: file.name, size: file.size },
-      }));
-
-      let offset = 0;
-      while (offset < file.size) {
-        if (cancelSendRef.current) throw new Error("Transfer cancelled.");
-        if (channel.readyState !== "open") {
-          throw new Error("The peer connection closed during transfer.");
-        }
-        if (channel.bufferedAmount > BUFFER_HIGH) {
-          await new Promise<void>((resolve, reject) => {
-            const onLow = () => {
-              channel.removeEventListener("close", onClose);
-              resolve();
-            };
-            const onClose = () => {
-              channel.removeEventListener("bufferedamountlow", onLow);
-              reject(new Error("The peer connection closed during transfer."));
-            };
-            channel.addEventListener("bufferedamountlow", onLow, { once: true });
-            channel.addEventListener("close", onClose, { once: true });
-          });
-        }
-
-        const chunk = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
-        if (cancelSendRef.current) throw new Error("Transfer cancelled.");
-        channel.send(chunk);
-        offset += chunk.byteLength;
+      for (const [index, file] of files.entries()) {
+        currentFile = file;
+        currentIndex = index;
         setTransfer({
           direction: "send",
           name: file.name,
-          transferred: offset,
+          transferred: 0,
           total: file.size,
           result: "active",
         });
+        setStatus(`Sending ${file.name} (${index + 1} of ${files.length}) directly to your peer...`);
+
+        channel.send(JSON.stringify({
+          type: "meta",
+          payload: { name: file.name, size: file.size },
+        }));
+
+        let offset = 0;
+        while (offset < file.size) {
+          if (cancelSendRef.current) throw new Error("Transfer cancelled.");
+          if (channel.readyState !== "open") {
+            throw new Error("The peer connection closed during transfer.");
+          }
+          if (channel.bufferedAmount > BUFFER_HIGH) {
+            await new Promise<void>((resolve, reject) => {
+              const onLow = () => {
+                channel.removeEventListener("close", onClose);
+                resolve();
+              };
+              const onClose = () => {
+                channel.removeEventListener("bufferedamountlow", onLow);
+                reject(new Error("The peer connection closed during transfer."));
+              };
+              channel.addEventListener("bufferedamountlow", onLow, { once: true });
+              channel.addEventListener("close", onClose, { once: true });
+            });
+          }
+
+          const chunk = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
+          if (cancelSendRef.current) throw new Error("Transfer cancelled.");
+          channel.send(chunk);
+          offset += chunk.byteLength;
+          setTransfer({
+            direction: "send",
+            name: file.name,
+            transferred: offset,
+            total: file.size,
+            result: "active",
+          });
+        }
+
+        if (cancelSendRef.current) throw new Error("Transfer cancelled.");
+        channel.send(JSON.stringify({ type: "eof" }));
+        setTransfer({
+          direction: "send",
+          name: file.name,
+          transferred: file.size,
+          total: file.size,
+          result: "complete",
+        });
+        setSelectedFiles(files.slice(index + 1));
       }
 
-      if (cancelSendRef.current) throw new Error("Transfer cancelled.");
-      channel.send(JSON.stringify({ type: "eof" }));
-      setTransfer({
-        direction: "send",
-        name: file.name,
-        transferred: file.size,
-        total: file.size,
-        result: "complete",
-      });
-      setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      setStatus(`${file.name} was sent successfully.`);
+      setStatus(`${files.length} file${files.length === 1 ? "" : "s"} sent successfully.`);
     } catch (error) {
       const cancelled = cancelSendRef.current;
+      setSelectedFiles(files.slice(currentIndex));
       setTransfer({
         direction: "send",
-        name: file.name,
+        name: currentFile.name,
         transferred: 0,
-        total: file.size,
+        total: currentFile.size,
         result: cancelled ? "idle" : "error",
       });
       setStatus(
         cancelled
-          ? "File transfer cancelled."
+          ? "File transfer cancelled. You can send the remaining files."
           : error instanceof Error
             ? error.message
             : "File transfer failed.",
@@ -621,7 +631,7 @@ export default function Home() {
         <div className="transfer-panel">
           <div className="panel-heading">
             <div>
-              <span className="section-kicker">01 / SEND A FILE</span>
+              <span className="section-kicker">01 / SEND FILES</span>
               <h2>Start sharing</h2>
             </div>
             <span className={`peer-pill ${peerState === "connected" ? "peer-ready" : ""}`}>
@@ -634,7 +644,11 @@ export default function Home() {
           ref={fileInputRef}
           className="visually-hidden"
           type="file"
-          onChange={(event) => selectFile(event.target.files?.[0])}
+          multiple
+          onChange={(event) => {
+            selectFiles(event.target.files ?? undefined);
+            event.currentTarget.value = "";
+          }}
           disabled={activeTransfer}
           />
           <div
@@ -659,16 +673,20 @@ export default function Home() {
           onDrop={(event) => {
             event.preventDefault();
             setDragging(false);
-            if (!activeTransfer) selectFile(event.dataTransfer.files[0]);
+            if (!activeTransfer) selectFiles(event.dataTransfer.files);
           }}
           >
           <span className="upload-icon" aria-hidden="true">↑</span>
           <span className="dropzone-title">
-            {selectedFile ? selectedFile.name : "Drop a file here"}
+            {selectedFiles.length === 0
+              ? "Drop files here"
+              : selectedFiles.length === 1
+                ? selectedFiles[0].name
+                : `${selectedFiles.length} files selected`}
             </span>
             <span className="dropzone-subtitle">
-              {selectedFile
-                ? `${formatBytes(selectedFile.size)} · Click to choose another`
+              {selectedFiles.length > 0
+                ? `${formatBytes(selectedFiles.reduce((total, file) => total + file.size, 0))} total · Click to choose files`
                 : "or click to browse your device"}
             </span>
           </div>
@@ -706,9 +724,11 @@ export default function Home() {
             className="primary-button send-button"
             type="button"
             onClick={() => void sendFile()}
-            disabled={!selectedFile || peerState !== "connected" || activeTransfer}
+            disabled={selectedFiles.length === 0 || peerState !== "connected" || activeTransfer}
           >
-            {activeTransfer ? "Transferring..." : "Send file"}
+            {activeTransfer
+              ? "Transferring..."
+              : `Send ${selectedFiles.length > 1 ? `${selectedFiles.length} files` : "file"}`}
             <span aria-hidden="true">↗</span>
           </button>
           <p className="privacy-note">Your file travels directly to the other device.</p>
