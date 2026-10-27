@@ -13,7 +13,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       id-token: write
@@ -33,46 +32,7 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: c24d6651-8acd-46b3-a9d9-34f402100083
-          tenant-id: 
-name: Deploy backend to Azure
-
-on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend.yml'
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
-
-      - name: Login to Azure
+      - name: Log in to Azure
         uses: azure/login@v2
         with:
           client-id: c24d6651-8acd-46b3-a9d9-34f402100083
@@ -86,11 +46,4 @@ jobs:
           slot-name: Production
           package: backend/
 
-          subscription-id: d4398743-6931-4370-855c-d3b97c901819
 
-      - name: Deploy backend to Azure
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: vishalph
-          slot-name: Production
-          package: backend/
