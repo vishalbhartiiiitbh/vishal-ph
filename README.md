@@ -8,11 +8,11 @@ channel and are not uploaded to MongoDB.
 ## Requirements
 
 - Node.js and npm
-- MongoDB Community Server running locally
-- MongoDB Compass (optional; use it to inspect the local database)
+- A MongoDB database (MongoDB Atlas or a local MongoDB instance)
+- MongoDB Compass (optional; use it to inspect the database)
 
-Compass is a database client, not the MongoDB server. Start your local MongoDB
-service first, then connect Compass to `mongodb://127.0.0.1:27017`.
+Compass is a database client, not the MongoDB server. The backend connects to
+the MongoDB instance configured by `MONGODB_URI`.
 
 ## Start the app
 
@@ -22,6 +22,7 @@ In the first terminal, configure and start the backend:
 cd backend
 npm install
 cp .env.example .env
+# Set MONGODB_URI in .env to your MongoDB Atlas connection string
 npm run dev
 ```
 
@@ -45,13 +46,24 @@ The room card includes **Show QR code**. A phone can scan it using its native
 camera and open the invite link; the page automatically joins that room. The
 **Scan QR** button also lets a browser scan an invite from inside the app.
 
-The backend defaults to `mongodb://127.0.0.1:27017` and the `vishal_ph` database.
-On first startup it creates a `rooms` collection, a unique room-code index, and
-a TTL index that removes expired room metadata. Compass can display the
-database, room codes, two peer IDs, room state, and timestamps.
+Set `MONGODB_URI` in `backend/.env` to your MongoDB Atlas connection string
+(or another MongoDB connection string) and optionally set
+`MONGODB_DB_NAME`. The backend requires this setting and will not silently
+store room data in a local MongoDB instance. In Atlas, create a database user
+and allow the backend host's IP address in Network Access; do not expose
+MongoDB publicly or commit the connection string.
 
-Set `MONGODB_URI` and optionally `MONGODB_DB_NAME` in `backend/.env` to use a
-different MongoDB instance. Keep credentials private and do not commit `.env`.
+On first room creation, the backend creates the configured database's `rooms`
+collection, a unique room-code index, and a TTL index that removes expired room
+metadata. Room records include the room code, member IDs, status, and timestamps.
+They expire after 10 minutes. You can inspect them in Atlas Data Explorer under
+the configured database and `rooms` collection while they are still active.
+
+The backend handles signaling and sends database operations to MongoDB. Its
+active WebSocket references are held in memory while devices are connected;
+room records are persisted in MongoDB. File contents are sent directly between
+devices and are not stored by the backend or in MongoDB.
+
 Set `NEXT_PUBLIC_SIGNALING_URL` in `frontend/.env.local` to use a different
 WebSocket endpoint; production deployments should use `wss://`.
 

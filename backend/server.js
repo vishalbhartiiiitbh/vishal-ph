@@ -7,16 +7,16 @@ const { MongoClient } = require('mongodb');
 const { WebSocket, WebSocketServer } = require('ws');
 
 const PORT = Number(process.env.PORT || 8080);
-const MONGODB_URI =
-  process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/vishal_ph';
+const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'vishal_ph';
 const ROOM_TTL_MS = 10 * 60 * 1000;
+const ROOM_EMPTY_TTL_MS = 2 * 60 * 1000;
 const ROOM_CODE_CHARACTERS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
-const mongoClient = new MongoClient(MONGODB_URI);
+let mongoClient;
 const socketMetadata = new Map();
 const liveRooms = new Map();
 
@@ -139,20 +139,23 @@ async function handleDisconnect(socket) {
   peers?.delete(peerId);
   if (peers?.size === 0) liveRooms.delete(roomCode);
 
+  const remainingPeers = liveRooms.get(roomCode);
+  const roomStillActive = Boolean(remainingPeers && remainingPeers.size > 0);
   const now = new Date();
   await rooms.updateOne(
     { roomCode },
     {
       $pull: { peers: { id: peerId } },
       $set: {
-        status: 'waiting',
+        status: roomStillActive ? 'full' : 'waiting',
         updatedAt: now,
-        expiresAt: new Date(now.getTime() + ROOM_TTL_MS),
+        expiresAt: new Date(
+          now.getTime() + (roomStillActive ? ROOM_TTL_MS : ROOM_EMPTY_TTL_MS),
+        ),
       },
     },
   );
 
-  const remainingPeers = liveRooms.get(roomCode);
   if (remainingPeers) {
     for (const remainingSocket of remainingPeers.values()) {
       send(remainingSocket, { type: 'peer-left', payload: { peerId } });
@@ -276,6 +279,13 @@ wss.on('connection', (socket) => {
 });
 
 async function start() {
+  if (!MONGODB_URI) {
+    throw new Error(
+      'MONGODB_URI is required. Set it in backend/.env to your MongoDB connection string.',
+    );
+  }
+
+  mongoClient = new MongoClient(MONGODB_URI);
   await mongoClient.connect();
   mongoConnected = true;
   const database = mongoClient.db(DATABASE_NAME);
@@ -293,7 +303,7 @@ async function shutdown() {
   mongoConnected = false;
   wss.close();
   server.close();
-  await mongoClient.close();
+  await mongoClient?.close();
 }
 
 process.on('SIGINT', () => {

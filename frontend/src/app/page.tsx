@@ -679,28 +679,87 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <Link className="brand" href="/" aria-label="Vishal PH home">
-          <span className="brand-mark">V</span>
-          <span>vishal<span className="brand-accent">.ph</span></span>
-        </Link>
-        <div className="server-status">
-          <span className={`status-dot ${signalingConnected ? "online" : ""}`} />
-          {signalingConnected ? "Service online" : "Connecting"}
-        </div>
-      </header>
+      <div className="landing-frame">
+        <header className="topbar">
+          <Link className="brand" href="/" aria-label="Vishal PH home">
+            <span className="brand-mark">V</span>
+            <span>vishal<span className="brand-accent">.ph</span></span>
+          </Link>
+          <nav className="top-nav" aria-label="Main navigation">
+            <a href="#workspace">Send files</a>
+            <a href="#connect-devices">Connect devices</a>
+            <a href="#how-it-works">How it works</a>
+          </nav>
+          <div className="topbar-actions">
+            <div className="server-status">
+              <span className={`status-dot ${signalingConnected ? "online" : ""}`} />
+              {signalingConnected ? "Service online" : "Connecting"}
+            </div>
+            <a className="nav-cta" href="#workspace">Get started <span aria-hidden="true">→</span></a>
+          </div>
+        </header>
 
-      <section className="page-intro">
-        <div className="hero-copy">
-          <div className="eyebrow"><span className="eyebrow-spark">✳</span> PRIVATE FILE TRANSFER</div>
-          <h1>Share privately. <span>Move freely.</span></h1>
-          <p className="hero-description">
-            Send files directly between devices, without uploading them to cloud storage.
-          </p>
-        </div>
-      </section>
+        <section className="page-intro">
+          <div className="hero-copy">
+            <div className="eyebrow"><span className="eyebrow-spark">✳</span> FAST · PRIVATE · DIRECT</div>
+            <h1>Share big files.<br /><span>Get it there.</span></h1>
+            <p className="hero-description">
+              Send files directly between devices. No cloud storage, no complicated setup—just connect and share.
+            </p>
+            <div className="hero-actions">
+              <a className="primary-button hero-cta" href="#workspace">Start sharing <span aria-hidden="true">→</span></a>
+              <a className="hero-secondary" href="#how-it-works"><span aria-hidden="true">▶</span> How it works</a>
+            </div>
+            <div className="hero-points" aria-label="Sharing features">
+              <span><i aria-hidden="true">↯</i> Peer-to-peer transfer</span>
+              <span><i aria-hidden="true">⌑</i> Private room codes</span>
+              <span><i aria-hidden="true">✓</i> No file storage</span>
+            </div>
+          </div>
 
-      <section className="workspace-grid" aria-label="File sharing workspace">
+          <div className="hero-visual" aria-hidden="true">
+            <div className="visual-orbit orbit-one" />
+            <div className="visual-orbit orbit-two" />
+            <div className="visual-file-card file-card-top">
+              <span className="file-type video-type">▶</span>
+              <span><strong>Project_video.mp4</strong><small>Ready to share</small></span>
+              <span className="file-check">✓</span>
+            </div>
+            <div className="visual-transfer-card">
+              <div className="visual-card-heading">
+                <span className="visual-app-icon">↗</span>
+                <span><strong>Direct transfer</strong><small>Device to device</small></span>
+                <span className="visual-menu">···</span>
+              </div>
+              <div className="visual-drop">
+                <span className="visual-cloud">↑</span>
+                <strong>Drop files to share</strong>
+                <small>or browse your device</small>
+              </div>
+              <div className="visual-peers">
+                <span className="peer-avatar avatar-blue">V</span>
+                <span className="peer-link">············</span>
+                <span className="peer-avatar avatar-violet">P</span>
+              </div>
+            </div>
+            <div className="visual-file-card file-card-bottom">
+              <span className="file-type image-type">▧</span>
+              <span><strong>Shared privately</strong><small>Files stay between devices</small></span>
+              <span className="file-check">✓</span>
+            </div>
+            <div className="visual-secure-card"><span>✓</span> No cloud upload</div>
+          </div>
+        </section>
+
+        <div className="feature-strip" id="how-it-works">
+          <div className="feature-label">MADE FOR EASY SHARING</div>
+          <div className="feature-item"><span className="feature-icon">↯</span><span><strong>Direct transfer</strong><small>Powered by WebRTC</small></span></div>
+          <div className="feature-item"><span className="feature-icon">⌑</span><span><strong>Private rooms</strong><small>Connect with a short code</small></span></div>
+          <div className="feature-item"><span className="feature-icon">✓</span><span><strong>No file storage</strong><small>Your files aren&apos;t uploaded</small></span></div>
+          <div className="feature-note">Simple sharing.<br /><strong>Device to device.</strong></div>
+        </div>
+
+      <section className="workspace-grid" id="workspace" aria-label="File sharing workspace">
         <div className="transfer-panel">
           <div className="panel-heading">
             <div>
@@ -842,7 +901,7 @@ export default function Home() {
           <p className="privacy-note">Your file travels directly to the other device.</p>
         </div>
 
-        <section className="room-section" aria-labelledby="room-heading">
+        <section className="room-section" id="connect-devices" aria-labelledby="room-heading">
         <div className="room-intro">
           <span className="section-kicker">02 / CONNECT DEVICES</span>
           <h2 id="room-heading">Meet in a private room.</h2>
@@ -933,11 +992,12 @@ export default function Home() {
         {roomActive && <span className="connection-state">{peerState}</span>}
       </div>
 
-      <footer className="footer">
-        <Link className="brand footer-brand" href="/">vishal<span className="brand-accent">.ph</span></Link>
-        <span>Files move between devices, not through our storage.</span>
-        <span className="footer-tech">POWERED BY WEBRTC</span>
-      </footer>
+        <footer className="footer">
+          <Link className="brand footer-brand" href="/">vishal<span className="brand-accent">.ph</span></Link>
+          <span>Files move between devices, not through our storage.</span>
+          <span className="footer-tech">POWERED BY WEBRTC</span>
+        </footer>
+      </div>
 
       {showRoomQr && roomActive && shareUrl && (
         <RoomQrDialog
