@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import JSZip from "jszip";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CameraScannerDialog } from "./components/CameraScannerDialog";
 import { RoomQrDialog } from "./components/RoomQrDialog";
@@ -77,6 +78,9 @@ export default function Home() {
   const [peerState, setPeerState] = useState("disconnected");
   const [status, setStatus] = useState("Connecting to the signaling server...");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState("");
+  const [folderFileCount, setFolderFileCount] = useState(0);
+  const [preparingFolder, setPreparingFolder] = useState(false);
   const [transfer, setTransfer] = useState<TransferState>(emptyTransfer);
   const [copied, setCopied] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -86,6 +90,7 @@ export default function Home() {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const incomingFileRef = useRef<{
     chunks: ArrayBuffer[];
@@ -458,6 +463,8 @@ export default function Home() {
     if (!files?.length) return;
     const selected = Array.from(files);
     setSelectedFiles(selected);
+    setSelectedFolder("");
+    setFolderFileCount(0);
     setTransfer({
       direction: "send",
       name: selected[0].name,
@@ -470,6 +477,69 @@ export default function Home() {
         ? `${selected.length} file${selected.length === 1 ? "" : "s"} ready to send.`
         : "Files selected. Connect to a peer before sending.",
     );
+  };
+
+  const selectFolder = async (files?: FileList) => {
+    if (!files?.length) return;
+    const folderFiles = Array.from(files);
+    const firstPath = folderFiles[0].webkitRelativePath;
+    if (!firstPath.includes("/")) {
+      setSelectedFiles([]);
+      setSelectedFolder("");
+      setFolderFileCount(0);
+      setStatus("This browser did not provide folder paths. Try a browser that supports folder selection.");
+      return;
+    }
+    const folderName = firstPath.split("/")[0];
+    const zip = new JSZip();
+
+    setSelectedFiles([]);
+    setSelectedFolder("");
+    setFolderFileCount(0);
+    setPreparingFolder(true);
+    setStatus(`Preparing ${folderName} folder...`);
+
+    try {
+      for (const file of folderFiles) {
+        zip.file(file.webkitRelativePath, file);
+      }
+
+      const archive = await zip.generateAsync(
+        {
+          type: "blob",
+          compression: "DEFLATE",
+          compressionOptions: { level: 1 },
+        },
+        ({ percent }) => {
+          setStatus(`Preparing ${folderName} folder... ${Math.round(percent)}%`);
+        },
+      );
+      const archiveFile = new File(
+        [archive],
+        `${safeFileName(folderName)}.zip`,
+        { type: "application/zip" },
+      );
+      setSelectedFiles([archiveFile]);
+      setSelectedFolder(folderName);
+      setFolderFileCount(folderFiles.length);
+      setPreparingFolder(false);
+      setTransfer({
+        direction: "send",
+        name: archiveFile.name,
+        transferred: 0,
+        total: archiveFile.size,
+        result: "idle",
+      });
+      setStatus(
+        channelRef.current?.readyState === "open"
+          ? `${folderName} is ready to send as a ZIP archive.`
+          : "Folder prepared. Connect to a peer before sending.",
+      );
+    } catch (error) {
+      console.error("Could not prepare folder archive:", error);
+      setPreparingFolder(false);
+      setStatus("Could not prepare the folder archive. Please try again.");
+    }
   };
 
   const sendFile = async () => {
@@ -550,6 +620,8 @@ export default function Home() {
       }
 
       if (fileInputRef.current) fileInputRef.current.value = "";
+      setSelectedFolder("");
+      setFolderFileCount(0);
       setStatus(`${files.length} file${files.length === 1 ? "" : "s"} sent successfully.`);
     } catch (error) {
       const cancelled = cancelSendRef.current;
@@ -602,6 +674,7 @@ export default function Home() {
   };
 
   const activeTransfer = transfer.result === "active";
+  const selectionLocked = activeTransfer || preparingFolder;
   const roomActive = Boolean(roomCode);
 
   return (
@@ -649,46 +722,77 @@ export default function Home() {
             selectFiles(event.target.files ?? undefined);
             event.currentTarget.value = "";
           }}
-          disabled={activeTransfer}
+          disabled={selectionLocked}
+          />
+          <input
+            ref={(input) => {
+              folderInputRef.current = input;
+              input?.setAttribute("webkitdirectory", "");
+            }}
+            className="visually-hidden"
+            type="file"
+            multiple
+            onChange={(event) => {
+              void selectFolder(event.target.files ?? undefined);
+              event.currentTarget.value = "";
+            }}
+            disabled={selectionLocked}
           />
           <div
-          className={`dropzone ${dragging ? "dropzone-active" : ""} ${activeTransfer ? "dropzone-disabled" : ""}`}
+          className={`dropzone ${dragging ? "dropzone-active" : ""} ${selectionLocked ? "dropzone-disabled" : ""}`}
           role="button"
-          tabIndex={activeTransfer ? -1 : 0}
-          aria-disabled={activeTransfer}
+          tabIndex={selectionLocked ? -1 : 0}
+          aria-disabled={selectionLocked}
           onClick={() => {
-            if (!activeTransfer) fileInputRef.current?.click();
+            if (!selectionLocked) fileInputRef.current?.click();
           }}
           onKeyDown={(event) => {
-            if (!activeTransfer && (event.key === "Enter" || event.key === " ")) {
+            if (!selectionLocked && (event.key === "Enter" || event.key === " ")) {
               event.preventDefault();
               fileInputRef.current?.click();
             }
           }}
           onDragOver={(event) => {
             event.preventDefault();
-            if (!activeTransfer) setDragging(true);
+            if (!selectionLocked) setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={(event) => {
             event.preventDefault();
             setDragging(false);
-            if (!activeTransfer) selectFiles(event.dataTransfer.files);
+            if (!selectionLocked) selectFiles(event.dataTransfer.files);
           }}
           >
           <span className="upload-icon" aria-hidden="true">↑</span>
           <span className="dropzone-title">
-            {selectedFiles.length === 0
-              ? "Drop files here"
-              : selectedFiles.length === 1
-                ? selectedFiles[0].name
-                : `${selectedFiles.length} files selected`}
+            {selectedFolder
+              ? `${selectedFolder} folder selected`
+              : selectedFiles.length === 0
+                ? "Drop files here"
+                : selectedFiles.length === 1
+                  ? selectedFiles[0].name
+                  : `${selectedFiles.length} files selected`}
             </span>
             <span className="dropzone-subtitle">
-              {selectedFiles.length > 0
+              {selectedFolder
+                ? `${folderFileCount} files · ${selectedFiles[0] ? formatBytes(selectedFiles[0].size) : "ZIP"} archive`
+                : selectedFiles.length > 0
                 ? `${formatBytes(selectedFiles.reduce((total, file) => total + file.size, 0))} total · Click to choose files`
                 : "or click to browse your device"}
             </span>
+          </div>
+          <div className="folder-picker-row">
+            <span className="folder-picker-note">Or select an entire folder</span>
+            <button
+              className="secondary-button folder-picker-button"
+              type="button"
+              onClick={() => {
+                if (!selectionLocked) folderInputRef.current?.click();
+              }}
+              disabled={selectionLocked}
+            >
+              Choose folder
+            </button>
           </div>
 
           {(transfer.name || activeTransfer) && (
@@ -726,9 +830,13 @@ export default function Home() {
             onClick={() => void sendFile()}
             disabled={selectedFiles.length === 0 || peerState !== "connected" || activeTransfer}
           >
-            {activeTransfer
+            {preparingFolder
+              ? "Preparing folder..."
+              : activeTransfer
               ? "Transferring..."
-              : `Send ${selectedFiles.length > 1 ? `${selectedFiles.length} files` : "file"}`}
+              : selectedFolder
+                ? "Send folder"
+                : `Send ${selectedFiles.length > 1 ? `${selectedFiles.length} files` : "file"}`}
             <span aria-hidden="true">↗</span>
           </button>
           <p className="privacy-note">Your file travels directly to the other device.</p>

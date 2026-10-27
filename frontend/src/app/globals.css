@@ -301,6 +301,23 @@ a:focus-visible {
   font-size: 11px;
 }
 
+.folder-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.folder-picker-note {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.folder-picker-button {
+  flex-shrink: 0;
+}
+
 .visually-hidden {
   display: none;
 }

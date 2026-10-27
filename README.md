@@ -35,8 +35,11 @@ npm run dev
 
 Open <http://localhost:3000> in two browser windows. Create a room in one,
 then join with its invite link or six-character code. Once the peer connection
-is ready, select multiple files in the file picker and choose **Send files**.
-The files are sent one by one, and each arrives as a separate download.
+is ready, select multiple files in the file picker or choose a folder with
+**Choose folder**. Send regular file selections with **Send files**; a folder
+selection includes files in its subfolders and is packaged into a ZIP archive
+that preserves the folder structure. Choose **Send folder** to send it. The
+other device receives one ZIP file; empty folders are not included.
 
 The room card includes **Show QR code**. A phone can scan it using its native
 camera and open the invite link; the page automatically joins that room. The
