@@ -36,7 +36,7 @@ jobs:
         uses: azure/login@v2
         with:
           client-id: c24d6651-8acd-46b3-ad9d-34f402100083
-          tenant-id: df99e5a6-4101-4719-bd23-0b0370b071b9
+          tenant-id: 184fac3a-13e3-4f86-bd05-9b578dce57ba
           subscription-id: d4398743-6931-4370-855c-d3b97c901819
 
       - name: Deploy backend to Azure
